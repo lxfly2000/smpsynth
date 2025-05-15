@@ -41,6 +41,13 @@ int smpsynth_init(int sampleRate, int channels, int initial_bpm, int ticksPerBea
 {
 	synthData.sampleRate = sampleRate;
 	synthData.channels.resize(channels);
+	for (int i = 0; i < channels; i++)
+	{
+		auto&ch = synthData.channels[i];
+		ch.sample = { 0 };
+		ch.volumeEnvelope = { SMPSYNTH_VOLUME_DEFAULT };
+		ch.panEnvelope = { SMPSYNTH_PAN_CENTER };
+	}
 	synthData.ticksPerBeat = ticksPerBeat;
 	smpsynth_setBpm(initial_bpm);
 	return 0;
@@ -56,7 +63,19 @@ void smpsynth_setSampleData(int channel, SMPSYNTH_SOUND_SAMPLE_DATATYPE*data, in
 	auto &ch = synthData.channels[channel];
 	ch.sample.assign(data, data + sampleCount);
 	ch.sampleLoopStart = loopStart;
+	if (loopEnd == -1)
+		loopEnd = sampleCount;
 	ch.sampleLoopEnd = loopEnd;
+}
+
+void smpsynth_setStandardScaleSampleData(int channel, SMPSYNTH_SOUND_SAMPLE_DATATYPE * data)
+{
+	smpsynth_setSampleData(channel, data, smpsynth_getStandardScaleSampleCount(), 0, -1);
+}
+
+int smpsynth_getStandardScaleSampleCount()
+{
+	return synthData.sampleRate / SMPSYNTH_STANDARD_SCALE_FREQUENCY;
 }
 
 void smpsynth_setSampleVolumeEnvelope(int channel, unsigned char * data, int bytes, int loopStart, int loopEnd)
@@ -64,6 +83,8 @@ void smpsynth_setSampleVolumeEnvelope(int channel, unsigned char * data, int byt
 	auto &ch = synthData.channels[channel];
 	ch.volumeEnvelope.assign(data, data + bytes);
 	ch.volumeEnvelopeLoopStart = loopStart;
+	if (loopEnd == -1)
+		loopEnd = bytes;
 	ch.volumeEnvelopeLoopEnd = loopEnd;
 }
 
@@ -72,6 +93,8 @@ void smpsynth_setSamplePanEnvelope(int channel, unsigned char * data, int bytes,
 	auto &ch = synthData.channels[channel];
 	ch.panEnvelope.assign(data, data + bytes);
 	ch.panEnvelopeLoopStart = loopStart;
+	if (loopEnd == -1)
+		loopEnd = bytes;
 	ch.panEnvelopeLoopEnd = loopEnd;
 }
 
@@ -123,11 +146,16 @@ void smpsynth_setNotePan(int channel, char data)
 	synthData.channels[channel].currentChannelPan = data;
 }
 
+int smpsynth_samplesPerTick()
+{
+	return synthData.sampleRate * 60 / synthData.bpm / synthData.ticksPerBeat;
+}
+
 void smpsynth_setBpm(int bpm)
 {
 	synthData.bpm = bpm;
 	//同时会影响TickBuffer长度
-	size_t bufferLength = _samples_per_tick()*SMPSYNTH_SOUND_CHANNELS;
+	size_t bufferLength = smpsynth_samplesPerTick()*SMPSYNTH_SOUND_CHANNELS;
 	for (size_t i = 0; i < synthData.channels.size(); i++)
 	{
 		if (synthData.channels[i].buffer.size() != bufferLength)
@@ -137,12 +165,7 @@ void smpsynth_setBpm(int bpm)
 		synthData.mixBuffer.resize(bufferLength);
 }
 
-int _samples_per_tick()
-{
-	return synthData.sampleRate * 60 / synthData.bpm / synthData.ticksPerBeat;
-}
-
-void pan_sample(unsigned char pan, short*left, short*right)
+void _panSample(unsigned char pan, short*left, short*right)
 {
 	//https://dsp.stackexchange.com/questions/21691/algorithm-to-pan-audio
 	float angle = (float)(pan - SMPSYNTH_PAN_CENTER) / (SMPSYNTH_PAN_RIGHT - SMPSYNTH_PAN_CENTER) * PI / 4;
@@ -152,7 +175,7 @@ void pan_sample(unsigned char pan, short*left, short*right)
 	*left = (short)(*left * ampA);
 }
 
-#define SCALE_SAMPLE_COUNT(scale,sample) ((int)((sample)*powf(2.0f, ((scale) - SMPSYNTH_STANDARD_SCALE) / 12.0f)))
+#define SCALE_SAMPLE_COUNT(scale,sample) ((int)((sample)*powf(2.0f, ((scale) - SMPSYNTH_STANDARD_SCALE_NUMBER) / 12.0f)))
 
 void _synthSample(int channel,int sampleCount)
 {
@@ -227,7 +250,7 @@ void _synthSample(int channel,int sampleCount)
 		}
 		if (panEnvelopePos >= ch.panEnvelope.size())
 			panEnvelopePos = ch.panEnvelope.size() - 1;
-		pan_sample(ch.panEnvelope[panEnvelopePos], &ch.buffer[i * 2], &ch.buffer[i * 2 + 1]);
+		_panSample(ch.panEnvelope[panEnvelopePos], &ch.buffer[i * 2], &ch.buffer[i * 2 + 1]);
 	}
 	ch.currentSynthSampleCount += sampleCount;
 	for (size_t i = sampleCount * SMPSYNTH_SOUND_CHANNELS; i < ch.buffer.size(); i++)
@@ -243,13 +266,13 @@ int smpsynth_getTickStream(SMPSYNTH_SOUND_SAMPLE_DATATYPE*streamData)
 		//先合成Sample
 		if (ch.currentChannelSynthScale)
 		{
-			int synthSampleCount = _samples_per_tick();
+			int synthSampleCount = smpsynth_samplesPerTick();
 			_synthSample(i, synthSampleCount);
 			//再合成轨道参数
 			for (size_t j = 0; j < ch.buffer.size(); j++)
 				ch.buffer[j] = ch.buffer[j] * ch.currentChannelVolume / SMPSYNTH_VOLUME_MAX;
 			for (size_t j = 0; j < ch.buffer.size() / 2; j++)
-				pan_sample(ch.currentChannelPan, &ch.buffer[j * 2], &ch.buffer[j * 2 + 1]);
+				_panSample(ch.currentChannelPan, &ch.buffer[j * 2], &ch.buffer[j * 2 + 1]);
 
 			//混音
 			for (size_t j = 0; j < synthData.mixBuffer.size(); j++)
