@@ -41,7 +41,7 @@ void smpsynth_setBpm(int bpm);
 //获取生成帧的采样数量
 int smpsynth_samplesPerTick();
 
-//生成所有通道混合的音频，同时使时间计时器推进smpsynth_samplesPerTick()返回的采样数，返回值为生成的采样数
+//生成所有通道混合的音频，同时使时间计时器推进smpsynth_samplesPerTick()返回的采样数，返回值为streamData写入元素个数（采样数*通道数）
 int smpsynth_getTickStream(SMPSYNTH_SOUND_SAMPLE_DATATYPE*streamData);
 
 //TODO:增加PITCH功能
