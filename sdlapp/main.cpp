@@ -163,6 +163,11 @@ std::map<SDL_Scancode, int>keyMap = {
 };
 
 int mouse_x = -1, mouse_y = -1;
+bool need_draw = true;
+void set_need_draw()
+{
+	need_draw = true;
+}
 
 int loop()
 {
@@ -180,23 +185,28 @@ int loop()
 			{
 			case SDL_WINDOWEVENT_RESIZED:
 				status_text = "Window Size: " + std::to_string(e.window.data1) + "x" + std::to_string(e.window.data2);
+				set_need_draw();
 				break;
 			}
 			break;
 		case SDL_KEYDOWN:
 			if (e.key.repeat == 0 && keyMap.find(e.key.keysym.scancode) != keyMap.end())
 				smpsynth_setNoteScale(inputChannel, keyMap[e.key.keysym.scancode] + scaleShift);
+			set_need_draw();
 			break;
 		case SDL_KEYUP:
 			smpsynth_setNoteScale(inputChannel, 0);
+			set_need_draw();
 			break;
 		case SDL_MOUSEBUTTONDOWN:
 			mouse_x = e.motion.x;
 			mouse_y = e.motion.y;
+			set_need_draw();
 			break;
 		case SDL_MOUSEBUTTONUP:
 			mouse_x = -1;
 			mouse_y = -1;
+			set_need_draw();
 			break;
 		case SDL_MOUSEMOTION:
 			if (mouse_x != -1)
@@ -204,6 +214,7 @@ int loop()
 				mouse_x = e.motion.x;
 				mouse_y = e.motion.y;
 			}
+			set_need_draw();
 			break;
 		}
 	}
@@ -265,6 +276,9 @@ bool draw_envelope(int x, int y, int width, int height, int padding, Type*data, 
 
 void draw()
 {
+	if (!need_draw)
+		return;
+	need_draw = false;
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 	SDL_RenderClear(renderer);
 
