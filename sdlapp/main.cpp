@@ -287,10 +287,8 @@ void draw()
 	if (ImGui::Begin("ImGUI"))
 	{
 		if (ImGui::BeginChild(1, ImVec2(300.0f, 50.0f)))
-		{
 			ImGui::Text(status_text.c_str());
-			ImGui::EndChild();
-		}
+		ImGui::EndChild();
 		ImGui::SliderInt("Scale Shift", &scaleShift, 0, 127);
 		ImGui::SliderInt("Input Channel", &inputChannel, 0, SMP_CHANNELS - 1);
 		if (ImGui::InputInt("Sample Count", &sampleSize[inputChannel]))
