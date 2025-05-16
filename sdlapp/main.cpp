@@ -239,7 +239,7 @@ bool draw_envelope(int x, int y, int width, int height, int padding, Type*data, 
 	}
 	SDL_SetRenderDrawColor(renderer, old_r, old_g, old_b, old_a);
 	static int lastI = -1;
-	if (mouseX >= x && mouseY >= y && mouseX < x + width && mouseY < y + height)
+	if (mouseX >= x && mouseY >= y && mouseX <= x + width && mouseY <= y + height)
 	{
 		int i = (mouseX - x)*(count - 1) / width;
 		if (i >= 0 && i < count)
